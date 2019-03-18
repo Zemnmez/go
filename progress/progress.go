@@ -4,10 +4,9 @@ package progress // import "zemn.me/progress"
 
 type Animation []string
 
-var Dots Animation = []string {
-	""
+var Dots Animation = []string{
+	"",
 	".",
 	"..",
 	"...",
 }
-
