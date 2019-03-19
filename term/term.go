@@ -103,7 +103,7 @@ func NewCanvas() (c Canvas, done func(), err error) {
 }
 
 type Component interface {
-	Render(c Canvas) ([]Child, error)
+	Render(s StateConroller, c Canvas) ([]Child, error)
 }
 
 type LoadingBar struct {
