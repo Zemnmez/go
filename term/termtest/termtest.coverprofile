@@ -1,0 +1,10 @@
+mode: atomic
+zemn.me/term/termtest/termtest.go:10.46,18.30 3 5
+zemn.me/term/termtest/termtest.go:24.2,24.8 1 5
+zemn.me/term/termtest/termtest.go:18.30,22.3 3 1240
+zemn.me/term/termtest/termtest.go:45.40,45.58 1 1
+zemn.me/term/termtest/termtest.go:47.40,52.2 1 1
+zemn.me/term/termtest/termtest.go:54.58,56.2 1 120101
+zemn.me/term/termtest/termtest.go:58.55,67.33 7 2
+zemn.me/term/termtest/termtest.go:71.2,71.11 1 2
+zemn.me/term/termtest/termtest.go:67.33,69.3 1 200
