@@ -8,6 +8,52 @@ import (
 	termtest "zemn.me/term/termtest"
 )
 
+var _ = Describe("Text", func() {
+	It("should implement term.Component", func(done Done) {
+		defer close(done)
+		var _ Component = Text("hi!")
+	})
+
+	When("rendered", func() {
+		It("should fill the buffer with text sequentially", func(done Done) {
+			defer close(done)
+			const text Text = "hello world!"
+			const w = 2
+			const h = (len(text) / 2) + 2
+			c := termtest.NewCanvas(w, h)
+
+			children, err := text.Render(c)
+			Expect(len(children)).To(Equal(0))
+			Expect(err).ToNot(HaveOccurred())
+
+			for i, r := range []rune(text) {
+				Expect(c.Base[i].Ch).To(Equal(r),
+					"%+v", c.Base)
+			}
+		})
+
+		It("should truncate upon overflow", func(done Done) {
+			defer close(done)
+			const text Text = "hello world!"
+			const w = 2
+			const h = 2
+			c := termtest.NewCanvas(w, h)
+
+			children, err := text.Render(c)
+			Expect(len(children)).To(Equal(0))
+			Expect(err).ToNot(HaveOccurred())
+
+			for i, r := range []rune(text) {
+				if i == w*h {
+					break
+				}
+				Expect(c.Base[i].Ch).To(Equal(r),
+					"%+v", c.Base)
+			}
+		})
+	})
+})
+
 var _ = Describe("LoadingBar", func() {
 	It("should implement term.Component", func(done Done) {
 		defer close(done)
