@@ -2,28 +2,6 @@
 // and re-rendering a tree of stateful components a la React.
 package reactive
 
-type Element struct {
-	value interface{}
-}
-
-func (e Element) Render(s StateController) []Component {
-	panic("an Element should not be rendered; instead its value should be used directly")
-
-}
-
-type StateController interface {
-	Update(func())
-}
-
-type Component interface {
-	Mount(s StateController)
-	Close()
-
-	Render(s StateController) ([]Render, err error)
-}
-
-type Render func() Component
-
 /*
 
 type Counter struct {
