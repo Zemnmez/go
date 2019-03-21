@@ -5,7 +5,9 @@ of stateful, encapsulated components å la React.
 This package is a low-level API that describes the internal workings
 of the implementation. For the consumer API, see zemn.me/term/react.
 
-THEORY
+
+
+Theory
 
 For a react-like component, we need components that describe
 their tree of dependencies for data, and are able to tell the
@@ -28,7 +30,10 @@ it's much less necessary to have good ShouldUpdate comparisons, and
 we totally avoid any need for anything like immutable.js by just not using
 pointers.
 
-PRACTICE
+
+
+
+Practice
 
 We start with a root Render function which constructs a tree of Components.
 This tree is passed to whatever package ultimately maps component data
@@ -105,10 +110,12 @@ func NewNode(c Component, m Mapper) (n Node) {
 // Errors are handled by the Update() function, which passes them to the
 // Mapper.
 func (n *Node) update() (err error) {
-	debug.Log("performing update on %s", reflect.TypeOf(n))
+	debug.Log(" [%s] performing update on %+v", reflect.TypeOf(n.Component), n.Component)
 
 	// Tell the mapper this Component has updated.
 	n.Mapper.Map(n.Component)
+
+	debug.Log("[%s] mapper updated", reflect.TypeOf(n.Component))
 
 	children, err := n.Render()
 
@@ -116,18 +123,24 @@ func (n *Node) update() (err error) {
 		return
 	}
 
-	if (len(children) != len(n.Children)) && !n.previouslyRendered {
-		return fmt.Errorf(
-			"had %d Children and now has %d"+
-				" the number of children a Component has is not"+
-				" allowed to change",
+	if n.previouslyRendered {
+		debug.Log("[%s] this is not the first time this component has rendered", reflect.TypeOf(n.Component))
 
-			len(n.Children),
-			len(children),
-		)
+		if len(children) != len(n.Children) {
+			return fmt.Errorf(
+				"had %d Children and now has %d;"+
+					" the number of children a Component has is not"+
+					" allowed to change",
+
+				len(n.Children),
+				len(children),
+			)
+		}
 	}
 
 	n.previouslyRendered = true
+
+	debug.Log("[%s] diffing %d children", reflect.TypeOf(n.Component), len(children))
 
 	for i, child := range children {
 		var update bool
@@ -181,6 +194,8 @@ func (n *Node) update() (err error) {
 // If an error occurs, it is passed to the Mapper via Mapper.Error().
 func (n Node) Update() {
 	if err := n.update(); err != nil {
+		debug.Log("[%s] ERROR: %s", reflect.TypeOf(n.Component), err)
+
 		n.Mapper.Error(
 			n.Component,
 			fmt.Errorf(

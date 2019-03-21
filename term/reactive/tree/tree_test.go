@@ -5,43 +5,50 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "zemn.me/term/reactive/tree"
-	"zemn.me/term/reactive/tree/treetest"
 )
 
 var _ = Describe("Tree", func() {
-	It("should pass a tree of components to the mapper", func(done Done) {
+	it("should pass a tree of components to the mapper", func(done done) {
 		defer close(done)
 
-		root := treetest.StaticComponent{Id: "root"}
-		child_a := treetest.StaticComponent{Id: "child_a"}
-		child_b := treetest.StaticComponent{Id: "child_b"}
-		child_a_a := treetest.StaticComponent{Id: "child_a_a"}
+		root := treetest.staticcomponent{id: "root"}
+		child_a := treetest.staticcomponent{id: "child_a"}
+		child_b := treetest.staticcomponent{id: "child_b"}
+		child_a_a := treetest.staticcomponent{id: "child_a_a"}
 
-		var component_list = []treetest.StaticComponent{
+		var component_list = []treetest.staticcomponent{
 			root, child_a, child_b, child_a_a,
 		}
 
-		root.Children = []Component{child_a, child_b}
-		child_a.Children = []Component{child_a_a}
+		root.children = []component{child_a, child_b}
+		child_a.children = []component{child_a_a}
 
-		var r treetest.Recorder
+		var r treetest.recorder
 
-		_ = NewNode(root, &r)
+		_ = newnode(root, &r)
 
 		// every component should have been passed to the mapper
-		Expect(len(component_list)).To(Equal(len(r.Components)))
-		var seenComponents = make(map[string]bool, len(component_list))
+		expect(len(component_list)).to(equal(len(r.components)))
+		var seencomponents = make(map[string]bool, len(component_list))
 
-		for _, c := range r.Components {
-			seenComponents[c.(treetest.StaticComponent).Id] =
+		for _, c := range r.components {
+			seencomponents[c.(treetest.staticcomponent).id] =
 				true
 		}
 
-		for _, staticComponent := range component_list {
-			Expect(seenComponents[staticComponent.Id]).To(
-				Equal(true),
-				"%s", staticComponent.Id,
+		for _, staticcomponent := range component_list {
+			expect(seencomponents[staticcomponent.id]).to(
+				equal(true),
+				"%s", staticcomponent.id,
 			)
 		}
 	})
+
+	/*
+		When("an update happens", func() {
+			It("should only update children that change", func(done Done) {
+				defer close(done)
+				Expect(true).To(Equal(false))
+			})
+		}) */
 })
