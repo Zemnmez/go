@@ -61,9 +61,9 @@ package tree
 import (
 	"fmt"
 	"reflect"
-)
 
-func (n Node) update() {}
+	"zemn.me/debug"
+)
 
 // A Mapper represents a method of converting
 // a Component to some final representation,
@@ -80,7 +80,7 @@ type Mapper interface {
 // its children should decide whether to update or not.
 type Node struct {
 	Component
-	Children []node
+	Children []Node
 	Mapper
 
 	// used to check if the number
@@ -105,11 +105,11 @@ func NewNode(c Component, m Mapper) (n Node) {
 // Errors are handled by the Update() function, which passes them to the
 // Mapper.
 func (n *Node) update() (err error) {
+	debug.Log("performing update on %s", reflect.TypeOf(n))
 
 	// Tell the mapper this Component has updated.
 	n.Mapper.Map(n.Component)
 
-	var err error
 	children, err := n.Render()
 
 	if err != nil {
@@ -183,13 +183,17 @@ func (n Node) Update() {
 	if err := n.update(); err != nil {
 		n.Mapper.Error(
 			n.Component,
-			fmt.Sprintf(
+			fmt.Errorf(
 				"Update error in Component %s: %s",
 				reflect.TypeOf(n.Component),
 				err,
 			),
 		)
 	}
+}
+
+type StateController interface {
+	Update()
 }
 
 type Component interface {
