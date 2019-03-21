@@ -145,6 +145,9 @@ func (n *Node) update() (err error) {
 	for i, child := range children {
 		var update bool
 
+		// have to clear up the logic here to deal with one or
+		// the other being nil... TODO
+
 		// we compare new to old here
 		// even though it makes for uglier code,
 		// because otherwise every component when updated
