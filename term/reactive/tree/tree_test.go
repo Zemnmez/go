@@ -5,48 +5,56 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "zemn.me/term/reactive/tree"
+	"zemn.me/term/reactive/tree/treetest"
 )
 
 var _ = Describe("Tree", func() {
-	it("should pass a tree of components to the mapper", func(done done) {
-		defer close(done)
+	When("a tree of Component is constructed", func() {
+		It("should pass the Components to the mapper", func() {
 
-		root := treetest.staticcomponent{id: "root"}
-		child_a := treetest.staticcomponent{id: "child_a"}
-		child_b := treetest.staticcomponent{id: "child_b"}
-		child_a_a := treetest.staticcomponent{id: "child_a_a"}
+			root := &treetest.StaticComponent{Id: "root"}
+			child_a := &treetest.StaticComponent{Id: "child_a"}
+			child_b := &treetest.StaticComponent{Id: "child_b"}
+			child_a_a := &treetest.StaticComponent{Id: "child_a_a"}
 
-		var component_list = []treetest.staticcomponent{
-			root, child_a, child_b, child_a_a,
-		}
+			var Component_list = []*treetest.StaticComponent{
+				root, child_a, child_b, child_a_a,
+			}
 
-		root.children = []component{child_a, child_b}
-		child_a.children = []component{child_a_a}
+			root.Children = []Component{child_a, child_b}
+			child_a.Children = []Component{child_a_a}
 
-		var r treetest.recorder
+			var r treetest.Recorder
 
-		_ = newnode(root, &r)
+			_ = NewNode(root, &r)
 
-		// every component should have been passed to the mapper
-		expect(len(component_list)).to(equal(len(r.components)))
-		var seencomponents = make(map[string]bool, len(component_list))
+			// every Component should have been passed to the mapper
+			Expect(len(Component_list)).To(Equal(len(r.Components)))
+			var seenComponents = make(map[string]bool, len(Component_list))
 
-		for _, c := range r.components {
-			seencomponents[c.(treetest.staticcomponent).id] =
-				true
-		}
+			for _, c := range r.Components {
+				seenComponents[c.(*treetest.StaticComponent).Id] =
+					true
+			}
+			for _, StaticComponent := range Component_list {
+				Expect(seenComponents[StaticComponent.Id]).To(
+					Equal(true),
+					"%s", StaticComponent.Id,
+				)
 
-		for _, staticcomponent := range component_list {
-			expect(seencomponents[staticcomponent.id]).to(
-				equal(true),
-				"%s", staticcomponent.id,
-			)
-		}
+				// component should have mounted
+				Expect(len(StaticComponent.MountCalls)).To(Equal(1))
+
+				// should not have asked whether to update
+				Expect(len(StaticComponent.ShouldUpdateCalls)).To(Equal(0))
+			}
+		})
+
 	})
 
 	/*
 		When("an update happens", func() {
-			It("should only update children that change", func(done Done) {
+			It("should only update.Children that change", func(done Done) {
 				defer close(done)
 				Expect(true).To(Equal(false))
 			})
