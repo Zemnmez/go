@@ -3,14 +3,39 @@
 package term // import "zemn.me/term"
 
 import (
-	"github.com/nsf/termbox-go"
 	"image"
+
+	"github.com/nsf/termbox-go"
+	"zemn.me/reactive"
 )
+
+type Component interface {
+	Render(c Canvas) (children []Component, err error)
+	Mount(s reactive.StateController)
+	Close()
+	ShouldUpdate(old Component) (bool, error)
+}
+
+type WithCanvas struct {
+	Component
+	Canvas
+}
+
+func (w WithCanvas) Mount(s reactive.StateController) { w.Component.Mount(s) }
+func (w WithCanvas) Close() { w.Component.Close() }
+func (w WithCanvas) ShouldUpdate(old reactive.Component) (should bool, err error) { return w.Component.ShouldUpdate(old) }
+func (w WithCanvas) Render() (children []reactive.Component, err error) {
+	c, err := w.Component.Render(w.Canvas)
+	if err != nil { return }
+
+	children = make([]reactive.Component, len(c))
+	for i := range c {
+		children[i] =
+	}
+}
 
 type Attribute = termbox.Attribute
 type Cell = termbox.Cell
-
-type Child struct { Canvas; Component }
 
 type Canvas interface {
 	Rect() image.Rectangle
@@ -22,13 +47,18 @@ type Canvas interface {
 type rootCanvas struct {
 	Cells [][]Cell
 }
-func (c rootCanvas) Rect() image.Rectangle {
-	w, h:=termbox.Size();return image.Rect(
-	0, 0,
-	w, h,
-)}
 
-func (c rootCanvas) SetCell(pos image.Point, cell Cell) { termbox.SetCell(pos.X, pos.Y, cell.Ch, cell.Fg, cell.Bg) }
+func (c rootCanvas) Rect() image.Rectangle {
+	w, h := termbox.Size()
+	return image.Rect(
+		0, 0,
+		w, h,
+	)
+}
+
+func (c rootCanvas) SetCell(pos image.Point, cell Cell) {
+	termbox.SetCell(pos.X, pos.Y, cell.Ch, cell.Fg, cell.Bg)
+}
 func (c rootCanvas) Buffer() [][]Cell { return c.Cells }
 func (c rootCanvas) Canvas(r image.Rectangle) Canvas {
 	cn := canvas{}
@@ -49,7 +79,6 @@ type canvas struct {
 	Cells         [][]Cell
 	Width, Height int
 }
-
 
 func (c canvas) Buffer() [][]Cell { return c.Cells }
 
@@ -91,70 +120,79 @@ func newRootCanvas() (c rootCanvas) {
 	return
 }
 
-
-
 func NewCanvas() (c Canvas, done func(), err error) {
-	err= termbox.Init()
-	if err != nil { return }
+	err = termbox.Init()
+	if err != nil {
+		return
+	}
 
-	c= newRootCanvas()
+	c = newRootCanvas()
 	done = termbox.Close
 	return
 }
 
-type Component interface {
-	Render(s StateConroller, c Canvas) ([]Child, error)
-}
-
 type LoadingBar struct {
-	Fill rune
-	Empty rune
+	Fill     rune
+	Empty    rune
 	Progress float64
+	Canvas
 }
 
-func (l LoadingBar) Render(c Canvas) (children []Child, err error) {
-	loaded := c.Canvas(image.Rect(
+func (l LoadingBar) Render() (children []reactive.Component, err error) {
+	loaded := c.Canvas.Canvas(image.Rect(
 		0, 0,
-		int(float64(c.Rect().Max.X) * l.Progress), c.Rect().Max.Y,
+		int(float64(c.Rect().Max.X)*l.Progress), c.Rect().Max.Y,
 	))
 
-	children = append(children, Child {
+	children = append(children, Child{
 		loaded,
-		Fill{ Ch: l.Fill },
+		Fill{Ch: l.Fill},
 	})
 
-	unloaded := c.Canvas(image.Rect(
+	unloaded := c.Canvas.Canvas(image.Rect(
 		int(float64(c.Rect().Max.X)*l.Progress), 0,
 		c.Rect().Max.X, c.Rect().Max.Y,
 	))
 
-	children = append(children, Child {
+	children = append(children, Child{
 		unloaded,
-		Fill { Ch: l.Empty },
+		Fill{Ch: l.Empty},
 	})
 
 	return
 }
 
-type Fill Cell
-func (f Fill) Render(c Canvas) (_ []Child, err error){
+type Fill struct {
+	Cell
+}
+
+func (Fill) Close()                                                         {}
+func (Fill) Mount(reactive.StateController)                                 {}
+func (f Fill) ShouldUpdate(old reactive.Component) (should bool, err error) { return old.Cell != f.Cell, nil }
+func (Fill) Name() string { return "fill" }
+func (f Fill) Render(c Canvas) (_ []reactive.Component, err error) {
 	rows := c.Buffer()
 	for y := range rows {
 		for x := range rows[y] {
-			rows[y][x] = Cell(f) }}
+			rows[y][x] = Cell(f)
+		}
+	}
 
-			return
+	return
 }
 
 type Text string
-func (f Text) Render(c Canvas) (_ []Child, err error) {
+
+func (f Text) Render(c Canvas) (_ []reactive.Component, err error) {
 	runes := []rune(f)
 	for i, r := range runes {
 		x := i % c.Rect().Dx()
 		y := i / c.Rect().Dx()
 		if x == c.Rect().Dx() ||
-		y == c.Rect().Dy() { break }
-		c.Buffer()[y][x] = Cell{ Ch: r }
+			y == c.Rect().Dy() {
+			break
+		}
+		c.Buffer()[y][x] = Cell{Ch: r}
 	}
 	return
 }

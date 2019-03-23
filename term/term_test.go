@@ -4,9 +4,16 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"zemn.me/reactive"
 	. "zemn.me/term"
 	termtest "zemn.me/term/termtest"
 )
+
+var _ = Describe("WithCanvas", func() {
+	It("should implement reactive.Component", func() {
+		var _ reactive.Component = WithCanvas{}
+	})
+})
 
 var _ = Describe("Text", func() {
 	It("should implement term.Component", func(done Done) {
