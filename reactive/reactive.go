@@ -10,11 +10,15 @@ func Render(c Component, m Mapper) {
 	tree.NewNode(c, m)
 }
 
+type StateController interface {
+	Update()
+}
+
 type Component interface {
 	// Mount is called when the Component is
 	// mapped to some representation, like an HTML element,
 	// or drawing area.
-	Mount(s StateController)
+	Mount(s tree.StateController)
 
 	// Close is called when the Component is removed
 	// from the representation by its parent replacing it
@@ -24,13 +28,13 @@ type Component interface {
 	// ShouldUpdate is called each time a parent re-renders.
 	// ShouldUpdate is used to determine if this Component should
 	// itself re-render.
-	ShouldUpdate(old Component) (bool, error)
+	ShouldUpdate(old tree.Component) (bool, error)
 
 	// Render produces a list of child components, or nothing.
 	// a []Component mus *not* change length or shuffle the
 	// defintions of its child components around, as the order
 	// has to be used to compare changes in state.
-	Render() ([]Component, error)
+	Render() ([]tree.Component, error)
 
 	Name() string
 }
@@ -43,12 +47,12 @@ type Component interface {
 type Mapper interface {
 	// Map is called whenever a Component is rendered
 	// or updated
-	Map(c Component)
+	Map(c tree.Component)
 
 	// UnMap is called whenever a Component has been removed
 	// i.e. closed
-	UnMap(c Component)
+	UnMap(c tree.Component)
 
 	// Error is called when an error occurs during rendering
-	Error(c Component, err error)
+	Error(c tree.Component, err error)
 }
