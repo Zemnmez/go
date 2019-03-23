@@ -104,7 +104,8 @@ type Node struct {
 // NewNode constructs a new state tree rooted at the Component c,
 // calling Mapper m.Map(Component) each time a state change occurs
 // in a Node.
-func NewNode(c Component, m Mapper) (n Node) {
+func NewNode(c Component, m Mapper) (n *Node) {
+	n = new(Node)
 	n.Component = c
 	n.Mapper = m
 
@@ -126,12 +127,12 @@ func (n Node) prepareChildren(nodes ...Node) (newChildren []Node) {
 // Errors are handled by the Update() function, which passes them to the
 // Mapper.
 func (n *Node) update() (err error) {
-	debug.Log(" [%s] performing update on %+v", reflect.TypeOf(n.Component), n.Component)
+	debug.Log(" %s performing update on %+v", n.Component.Name(), n.Component)
 
 	// Tell the mapper this Component has updated.
 	n.Mapper.Map(n.Component)
 
-	debug.Log("[%s] mapper updated", reflect.TypeOf(n.Component))
+	debug.Log("%s mapper updated", n.Component.Name())
 
 	newChildren, err := n.Render()
 
@@ -140,7 +141,7 @@ func (n *Node) update() (err error) {
 	}
 
 	if n.previouslyRendered {
-		debug.Log("[%s] this is not the first time this component has rendered", reflect.TypeOf(n.Component))
+		debug.Log("%s this is not the first time this component has rendered", reflect.TypeOf(n.Component))
 
 		if len(newChildren) != len(n.Children) {
 			return fmt.Errorf(
@@ -156,9 +157,14 @@ func (n *Node) update() (err error) {
 
 	n.previouslyRendered = true
 
-	debug.Log("[%s] diffing %d children", reflect.TypeOf(n.Component), len(newChildren))
+	debug.Log("%s diffing %d children", n.Component.Name(), len(newChildren))
 
 	if len(newChildren) > len(n.Children) {
+		debug.Log(
+			"%s making new Node.Children as was previously %+v",
+			n.Component.Name(),
+			n.Children,
+		)
 		n.Children = n.prepareChildren(make([]Node, len(newChildren))...)
 	}
 
@@ -168,6 +174,7 @@ func (n *Node) update() (err error) {
 		shouldUpdate := false
 		mounted := false
 		unmounted := false
+
 		switch {
 		// was nil, now defined, no need to ask if update is needed
 		case oldChild == nil && newChild != nil:
@@ -180,6 +187,8 @@ func (n *Node) update() (err error) {
 		// delegate to new child as to whether
 		// update is needed
 		case newChild != nil && oldChild != nil:
+			debug.Log("[%s] ShouldUpdate?", newChild.Name())
+
 			shouldUpdate, err = newChild.ShouldUpdate(oldChild)
 			if err != nil {
 				return
@@ -206,19 +215,19 @@ func (n *Node) update() (err error) {
 		}
 
 		debug.Log(
-			"[%s] child %d was %+v, now %+v",
-			reflect.TypeOf(n.Component),
+			"%s child %d was %+v, now %+v",
+			n.Component.Name(),
 			i,
 			oldChild,
 			newChild,
 		)
 
 		debug.Log(
-			`[%s] child %d:
+			`%s child %d:
 	was unmounted: %v
 	was mounted: %v
 	needs to be updated: %v`,
-			reflect.TypeOf(n.Component),
+			n.Component.Name(),
 			i,
 			unmounted,
 			mounted,
@@ -240,7 +249,7 @@ func (n *Node) update() (err error) {
 		n.Children[i].Component = newChild
 
 		if mounted {
-			n.Children[i].Mount(n)
+			n.Children[i].Mount(&n.Children[i])
 		}
 
 		if shouldUpdate {
@@ -260,7 +269,7 @@ func (n *Node) update() (err error) {
 // any have changed.
 //
 // If an error occurs, it is passed to the Mapper via Mapper.Error().
-func (n Node) Update() {
+func (n *Node) Update() {
 	if err := n.update(); err != nil {
 		debug.Log("[%s] ERROR: %s", reflect.TypeOf(n.Component), err)
 
@@ -300,4 +309,6 @@ type Component interface {
 	// defintions of its child components around, as the order
 	// has to be used to compare changes in state.
 	Render() ([]Component, error)
+
+	Name() string
 }
