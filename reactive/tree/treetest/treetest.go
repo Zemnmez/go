@@ -1,7 +1,7 @@
 package treetest
 
 import (
-	"zemn.me/term/reactive/tree"
+	"zemn.me/reactive/tree"
 )
 
 type RecordedError struct {
@@ -10,11 +10,13 @@ type RecordedError struct {
 }
 
 type Recorder struct {
-	Components []tree.Component
-	Errors     []RecordedError
+	Components       []tree.Component
+	ClosedComponents []tree.Component
+	Errors           []RecordedError
 }
 
-func (r *Recorder) Map(c tree.Component) { r.Components = append(r.Components, c) }
+func (r *Recorder) UnMap(c tree.Component) { r.ClosedComponents = append(r.ClosedComponents, c) }
+func (r *Recorder) Map(c tree.Component)   { r.Components = append(r.Components, c) }
 func (r *Recorder) Error(c tree.Component, err error) {
 	r.Errors = append(r.Errors, RecordedError{c, err})
 }

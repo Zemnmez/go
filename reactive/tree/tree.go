@@ -76,7 +76,15 @@ import (
 //
 // The Mapper is called on every compnent each time it updates.
 type Mapper interface {
+	// Map is called whenever a Component is rendered
+	// or updated
 	Map(c Component)
+
+	// UnMap is called whenever a Component has been removed
+	// i.e. closed
+	UnMap(c Component)
+
+	// Error is called when an error occurs during rendering
 	Error(c Component, err error)
 }
 
@@ -104,6 +112,14 @@ func NewNode(c Component, m Mapper) (n Node) {
 	return
 }
 
+func (n Node) prepareChildren(nodes ...Node) (newChildren []Node) {
+	for i := range nodes {
+		nodes[i].Mapper = n.Mapper
+	}
+
+	return nodes
+}
+
 // The update function re-renders the children of this Node,
 // and asks them if they need to update their children via Update().
 //
@@ -117,7 +133,7 @@ func (n *Node) update() (err error) {
 
 	debug.Log("[%s] mapper updated", reflect.TypeOf(n.Component))
 
-	children, err := n.Render()
+	newChildren, err := n.Render()
 
 	if err != nil {
 		return
@@ -126,62 +142,111 @@ func (n *Node) update() (err error) {
 	if n.previouslyRendered {
 		debug.Log("[%s] this is not the first time this component has rendered", reflect.TypeOf(n.Component))
 
-		if len(children) != len(n.Children) {
+		if len(newChildren) != len(n.Children) {
 			return fmt.Errorf(
 				"had %d Children and now has %d;"+
 					" the number of children a Component has is not"+
 					" allowed to change",
 
 				len(n.Children),
-				len(children),
+				len(newChildren),
 			)
 		}
 	}
 
 	n.previouslyRendered = true
 
-	debug.Log("[%s] diffing %d children", reflect.TypeOf(n.Component), len(children))
+	debug.Log("[%s] diffing %d children", reflect.TypeOf(n.Component), len(newChildren))
 
-	for i, child := range children {
-		var update bool
+	if len(newChildren) > len(n.Children) {
+		n.Children = n.prepareChildren(make([]Node, len(newChildren))...)
+	}
 
-		// have to clear up the logic here to deal with one or
-		// the other being nil... TODO
+	for i := range newChildren {
+		newChild, oldChild := newChildren[i], n.Children[i].Component
 
-		// we compare new to old here
-		// even though it makes for uglier code,
-		// because otherwise every component when updated
-		// to a nil component would be an awkward case to handle.
-		if child != nil {
-			update, err = child.ShouldUpdate(n.Children[i].Component)
+		shouldUpdate := false
+		mounted := false
+		unmounted := false
+		switch {
+		// was nil, now defined, no need to ask if update is needed
+		case oldChild == nil && newChild != nil:
+			shouldUpdate = true
+			mounted = true
+
+			//unmounted = false
+
+		// both new and old were non-nil:
+		// delegate to new child as to whether
+		// update is needed
+		case newChild != nil && oldChild != nil:
+			shouldUpdate, err = newChild.ShouldUpdate(oldChild)
 			if err != nil {
 				return
 			}
+
+			//mounted = false
+			//unmounted = falde
+
+		// nothing to do
+		case newChild == nil && oldChild == nil:
+			//shouldUpdate = false
+
+		// removed
+		case oldChild != nil && newChild == nil:
+			unmounted = true
+			//mounted = false
+			//shouldUpdate = false
+		default:
+			panic(fmt.Sprintf(
+				"unknown state: old %+v, new %+v",
+				oldChild,
+				newChild,
+			))
 		}
 
-		// if the child was previously nil, and now is not,
-		// the component Mounted.
-		//
-		// if the child was previously non-nil, and now is,
-		// the component needs to be Closed.
-		if child == nil || n.Children[i].Component == nil {
-			// removed
-			if child == nil && n.Children[i].Component != nil {
-				n.Children[i].Component.Close()
-			}
+		debug.Log(
+			"[%s] child %d was %+v, now %+v",
+			reflect.TypeOf(n.Component),
+			i,
+			oldChild,
+			newChild,
+		)
 
-			if child != nil && n.Children[i].Component == nil {
-				child.Mount(n)
-			}
+		debug.Log(
+			`[%s] child %d:
+	was unmounted: %v
+	was mounted: %v
+	needs to be updated: %v`,
+			reflect.TypeOf(n.Component),
+			i,
+			unmounted,
+			mounted,
+			shouldUpdate,
+		)
+
+		debug.Assert(
+			!(unmounted == true && mounted == unmounted),
+			"cannot be both mounted and unmounted! "+
+				"mounted: %v, unmounted: %v",
+			mounted, unmounted,
+		)
+
+		if unmounted {
+			n.Children[i].Close()
+			n.Mapper.UnMap(n.Children[i])
 		}
 
-		n.Children[i].Component = child
+		n.Children[i].Component = newChild
 
-		if !update {
-			continue
+		if mounted {
+			n.Children[i].Mount(n)
 		}
 
-		n.Children[i].Update()
+		if shouldUpdate {
+			n.Children[i].Update()
+		}
+
 	}
 
 	return
