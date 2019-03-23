@@ -137,12 +137,4 @@ var _ = Describe("Tree Update", func() {
 			})
 		}
 	})
-
-	/*
-		When("an update happens", func() {
-			It("should only update.Children that change", func(done Done) {
-				defer close(done)
-				Expect(true).To(Equal(false))
-			})
-		}) */
 })

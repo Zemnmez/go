@@ -1,53 +1,54 @@
-//Package reactive exposes functionality for rendering
-// and re-rendering a tree of stateful components a la React.
+//Package reactive exposes APIs allowing React-like trees of
+//components.
+//
+// For more in-depth information on the design, see ./tree.
 package reactive
 
-/*
+import "zemn.me/reactive/tree"
 
-type Counter struct {
-	count int
-
-	close chan-> bool
+func Render(c Component, m Mapper) {
+	tree.NewNode(c, m)
 }
 
-func (c *Counter) Close() {
-	close(c.close)
+type Component interface {
+	// Mount is called when the Component is
+	// mapped to some representation, like an HTML element,
+	// or drawing area.
+	Mount(s StateController)
+
+	// Close is called when the Component is removed
+	// from the representation by its parent replacing it
+	// with `nil`.
+	Close()
+
+	// ShouldUpdate is called each time a parent re-renders.
+	// ShouldUpdate is used to determine if this Component should
+	// itself re-render.
+	ShouldUpdate(old Component) (bool, error)
+
+	// Render produces a list of child components, or nothing.
+	// a []Component mus *not* change length or shuffle the
+	// defintions of its child components around, as the order
+	// has to be used to compare changes in state.
+	Render() ([]Component, error)
+
+	Name() string
 }
 
-func (c *Counter) Mount(s StateController) {
-	c.close = make(chan bool)
+// A Mapper represents a method of converting
+// a Component to some final representation,
+// for example an HTML DOM object or an area on a screen.
+//
+// The Mapper is called on every compnent each time it updates.
+type Mapper interface {
+	// Map is called whenever a Component is rendered
+	// or updated
+	Map(c Component)
 
-	go func() {
-		for {
-			select {
-			case <-time.After(1*time.Second):
-				s.Update(func() { c.count++ })
-			case <-c.close:
-				return
-			}
-		}
-	}
+	// UnMap is called whenever a Component has been removed
+	// i.e. closed
+	UnMap(c Component)
+
+	// Error is called when an error occurs during rendering
+	Error(c Component, err error)
 }
-
-type Text struct {
-	text string
-}
-
-func (t Text) Render() []Render {
-	return []Render{
-		reactive.Element{ t.text }
-	}
-}
-
-func (f Fill) Render(s StateController) (children []Component, err error){
-	return []Component{
-		reactive.Element{ f.count },
-	}, nil
-}
-
-type App struct { }
-func (a App) Render() {
-	return Counter{}
-}
-
-*/
