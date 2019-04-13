@@ -7,45 +7,70 @@ import (
 
 	"github.com/nsf/termbox-go"
 	"zemn.me/reactive"
+	"zemn.me/reactive/tree"
 )
-
-type Component interface {
-	Render(c Canvas) (children []Component, err error)
-	Mount(s reactive.StateController)
-	Close()
-	ShouldUpdate(old Component) (bool, error)
-}
-
-type WithCanvas struct {
-	Component
-	Canvas
-}
-
-func (w WithCanvas) Mount(s reactive.StateController) { w.Component.Mount(s) }
-func (w WithCanvas) Close() { w.Component.Close() }
-func (w WithCanvas) ShouldUpdate(old reactive.Component) (should bool, err error) { return w.Component.ShouldUpdate(old) }
-func (w WithCanvas) Render() (children []reactive.Component, err error) {
-	c, err := w.Component.Render(w.Canvas)
-	if err != nil { return }
-
-	children = make([]reactive.Component, len(c))
-	for i := range c {
-		children[i] =
-	}
-}
 
 type Attribute = termbox.Attribute
 type Cell = termbox.Cell
+
+var _ reactive.Component = &Term{}
+
+type Term struct {
+	RenderFunc func(Canvas) (components []tree.Component, err error)
+	Canvas
+	stop chan bool
+}
+
+func New(render func(Canvas) (components []tree.Component, err error)) (term *Term, err error) {
+	err = termbox.Init()
+	if err != nil {
+		return
+	}
+
+	return &Term{RenderFunc: render, Canvas: newRootCanvas()}, nil
+}
+
+func (Term) Name() string { return "term" }
+func (t Term) ShouldUpdate(old tree.Component) (bool, error) {
+	a, b := t, *old.(*Term)
+	if a.Canvas.ShouldUpdate(b.Canvas) {
+		return true, nil
+	}
+	a.Canvas, b.Canvas = nil, nil
+	return false, nil
+}
+func (t Term) Render() ([]tree.Component, error) { return t.RenderFunc(t.Canvas) }
+func (t Term) Close()                            { close(t.stop) }
+func (t *Term) Mount(s tree.StateController) {
+	go func() {
+		for {
+			// TODO: make this a channel somehow?
+			ev := termbox.PollEvent()
+			switch ev.Type {
+			case termbox.EventResize:
+				t.Canvas = newRootCanvas()
+				s.Update()
+			}
+		}
+	}()
+}
 
 type Canvas interface {
 	Rect() image.Rectangle
 	SetCell(pos image.Point, cell Cell)
 	Buffer() [][]Cell
 	Canvas(image.Rectangle) Canvas
+	ShouldUpdate(c Canvas) bool
 }
 
 type rootCanvas struct {
 	Cells [][]Cell
+}
+
+func (r rootCanvas) ShouldUpdate(c Canvas) bool {
+	a, b := r, c.(rootCanvas)
+	return len(a.Cells) != len(b.Cells) ||
+		(len(a.Cells) > 0 && (len(a.Cells[0]) != len(b.Cells[0])))
 }
 
 func (c rootCanvas) Rect() image.Rectangle {
@@ -78,6 +103,11 @@ func (c rootCanvas) Canvas(r image.Rectangle) Canvas {
 type canvas struct {
 	Cells         [][]Cell
 	Width, Height int
+}
+
+func (c canvas) ShouldUpdate(c2 Canvas) bool {
+	a, b := c, c2.(canvas)
+	return a.Width != b.Width || a.Height != b.Height
 }
 
 func (c canvas) Buffer() [][]Cell { return c.Cells }
@@ -120,16 +150,7 @@ func newRootCanvas() (c rootCanvas) {
 	return
 }
 
-func NewCanvas() (c Canvas, done func(), err error) {
-	err = termbox.Init()
-	if err != nil {
-		return
-	}
-
-	c = newRootCanvas()
-	done = termbox.Close
-	return
-}
+var _ tree.Component = LoadingBar{}
 
 type LoadingBar struct {
 	Fill     rune
@@ -138,25 +159,48 @@ type LoadingBar struct {
 	Canvas
 }
 
-func (l LoadingBar) Render() (children []reactive.Component, err error) {
-	loaded := c.Canvas.Canvas(image.Rect(
+func (LoadingBar) Mount(tree.StateController) {}
+func (LoadingBar) Close()                     {}
+func (l LoadingBar) ShouldUpdate(old tree.Component) (should bool, err error) {
+	a, b := l, old.(LoadingBar)
+	if a.Canvas.ShouldUpdate(b.Canvas) {
+		return true, nil
+	}
+	a.Canvas, b.Canvas = nil, nil
+	should = a != b
+	return
+}
+func (LoadingBar) Name() string { return "LoadingBar" }
+func (l LoadingBar) Render() (children []tree.Component, err error) {
+	termbox.Flush()
+	c := l.Canvas
+
+	/*
+			 - loaded - unloaded -
+		     x-----------|-------x
+			 |###########|///////|
+			 |###########|///////|
+			 x-----------|-------|
+	*/
+	loaded := c.Canvas(image.Rect(
 		0, 0,
-		int(float64(c.Rect().Max.X)*l.Progress), c.Rect().Max.Y,
+		int(float64(c.Rect().Max.X)*l.Progress),
+		c.Rect().Max.Y,
 	))
 
-	children = append(children, Child{
-		loaded,
-		Fill{Ch: l.Fill},
+	children = append(children, Fill{
+		Canvas: loaded,
+		Cell:   Cell{Ch: l.Fill},
 	})
 
-	unloaded := c.Canvas.Canvas(image.Rect(
+	unloaded := c.Canvas(image.Rect(
 		int(float64(c.Rect().Max.X)*l.Progress), 0,
 		c.Rect().Max.X, c.Rect().Max.Y,
 	))
 
-	children = append(children, Child{
-		unloaded,
-		Fill{Ch: l.Empty},
+	children = append(children, Fill{
+		Canvas: unloaded,
+		Cell:   Cell{Ch: l.Empty},
 	})
 
 	return
@@ -164,27 +208,53 @@ func (l LoadingBar) Render() (children []reactive.Component, err error) {
 
 type Fill struct {
 	Cell
+	Canvas
 }
 
-func (Fill) Close()                                                         {}
-func (Fill) Mount(reactive.StateController)                                 {}
-func (f Fill) ShouldUpdate(old reactive.Component) (should bool, err error) { return old.Cell != f.Cell, nil }
+func (Fill) Close()                     {}
+func (Fill) Mount(tree.StateController) {}
+func (f Fill) ShouldUpdate(old tree.Component) (should bool, err error) {
+	a, b := f, old.(Fill)
+	if a.Canvas.ShouldUpdate(b.Canvas) {
+		return true, nil
+	}
+	a.Canvas, b.Canvas = nil, nil
+	return a != b, nil
+}
 func (Fill) Name() string { return "fill" }
-func (f Fill) Render(c Canvas) (_ []reactive.Component, err error) {
+func (f Fill) Render() (_ []tree.Component, err error) {
+	c := f.Canvas
 	rows := c.Buffer()
 	for y := range rows {
 		for x := range rows[y] {
-			rows[y][x] = Cell(f)
+			rows[y][x] = Cell(f.Cell)
 		}
 	}
 
 	return
 }
 
-type Text string
+var _ reactive.Component = Text{}
 
-func (f Text) Render(c Canvas) (_ []reactive.Component, err error) {
-	runes := []rune(f)
+type Text struct {
+	Text string
+	Canvas
+}
+
+func (Text) Name() string { return "text" }
+func (t Text) ShouldUpdate(old tree.Component) (bool, error) {
+	a, b := t, old.(Text)
+	if a.Canvas.ShouldUpdate(b.Canvas) {
+		return true, nil
+	}
+	a.Canvas, b.Canvas = nil, nil
+	return a != b, nil
+}
+func (t Text) Close()                     {}
+func (t Text) Mount(tree.StateController) {}
+func (f Text) Render() (_ []tree.Component, err error) {
+	c := f.Canvas
+	runes := []rune(f.Text)
 	for i, r := range runes {
 		x := i % c.Rect().Dx()
 		y := i / c.Rect().Dx()

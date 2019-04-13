@@ -127,7 +127,7 @@ func (n Node) prepareChildren(nodes ...Node) (newChildren []Node) {
 // Errors are handled by the Update() function, which passes them to the
 // Mapper.
 func (n *Node) update() (err error) {
-	debug.Log(" %s performing update on %+v", n.Component.Name(), n.Component)
+	debug.Log(" %s performing update ", n.Component.Name())
 
 	// Tell the mapper this Component has updated.
 	n.Mapper.Map(n.Component)
@@ -161,9 +161,8 @@ func (n *Node) update() (err error) {
 
 	if len(newChildren) > len(n.Children) {
 		debug.Log(
-			"%s making new Node.Children as was previously %+v",
+			"%s making new Node.Children",
 			n.Component.Name(),
-			n.Children,
 		)
 		n.Children = n.prepareChildren(make([]Node, len(newChildren))...)
 	}
@@ -215,11 +214,9 @@ func (n *Node) update() (err error) {
 		}
 
 		debug.Log(
-			"%s child %d was %+v, now %+v",
+			"%s child %d was, now ",
 			n.Component.Name(),
 			i,
-			oldChild,
-			newChild,
 		)
 
 		debug.Log(
