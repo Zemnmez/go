@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"image"
 	"time"
 
 	"github.com/nsf/termbox-go"
@@ -29,7 +31,29 @@ func (f FakeProcess) ShouldUpdate(old tree.Component) (bool, error) {
 	return f != *old.(*FakeProcess), nil
 }
 func (f FakeProcess) Render() (components []tree.Component, err error) {
-	return []tree.Component{f.LoadingBar}, nil
+	// give at least one line to the text
+	topLine := f.Canvas.Canvas(image.Rect(
+		0, 0,
+		f.Canvas.Rect().Max.X, 1,
+	))
+
+	allTheRest := f.Canvas.Canvas(image.Rect(
+		1, 1,
+		f.Canvas.Rect().Max.X-2, f.Canvas.Rect().Max.Y-1,
+	))
+
+	f.LoadingBar.Canvas = allTheRest
+	return []tree.Component{
+		term.Text{
+			Canvas: topLine,
+			Text: fmt.Sprintf(
+				"%d/%d",
+				int(f.LoadingBar.Progress*100),
+				100,
+			),
+		},
+		f.LoadingBar,
+	}, nil
 }
 
 func (f *FakeProcess) Mount(s tree.StateController) {
@@ -38,8 +62,8 @@ func (f *FakeProcess) Mount(s tree.StateController) {
 			select {
 			case <-f.done:
 				return
-			case <-time.After(1 * time.Second):
-				f.LoadingBar.Progress = (f.LoadingBar.Progress + 0.1)
+			case <-time.After(10 * time.Millisecond):
+				f.LoadingBar.Progress = (f.LoadingBar.Progress + 0.01)
 				if f.LoadingBar.Progress > 1 {
 					f.LoadingBar.Progress = 0
 				}
